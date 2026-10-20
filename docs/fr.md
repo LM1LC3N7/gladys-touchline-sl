@@ -1,67 +1,93 @@
-# Template de démonstration
+# Roth Touchline SL pour Gladys
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Cette intégration affiche les zones (pièces) de votre plancher chauffant
+**Roth Touchline SL** dans Gladys, par l'API publique Roth Touchline SL
+(le cloud qu'utilise l'application Roth Touchline SL), avec l'adresse e-mail
+et le mot de passe de votre compte Roth.
 
-## Ce que vous obtenez
+**Jamais testé avec un vrai régulateur ni un vrai compte** : elle suit la
+bibliothèque pytouchlinesl (celle de l'intégration Home Assistant), sans
+avoir pu être essayée sur une installation réelle. Dites-nous sur le forum
+si elle fonctionne chez vous. **Sans lien avec Roth.**
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+## Ce qu'elle fait
 
-## Configuration
+Pour chaque zone allumée de chaque régulateur du compte, un appareil
+« Nom de la pièce (Touchline SL) » avec :
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+- température et humidité de la pièce ;
+- consigne (thermostat) ;
+- chauffe en cours (repos, chauffe ou rafraîchissement, en lecture seule) ;
+- programme (liste : température constante ou l'un des programmes du
+  régulateur) et mode lu (« Programme « Salon » », « Température
+  constante », « Consigne temporaire »…) ;
+- état de la zone (OK, capteur endommagé, pas de communication…) ;
+- fenêtre ouverte (si des capteurs de fenêtre sont reliés), batterie du
+  thermostat d'ambiance.
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+Les zones éteintes dans le régulateur ne sont pas proposées.
 
-## Actions
+## Installation
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+1. Installez l'intégration depuis le store de Gladys.
+2. Saisissez l'adresse e-mail et le mot de passe de votre compte Roth
+   Touchline SL, puis enregistrez. Le mot de passe est gardé par Gladys dans
+   sa base, jamais réaffiché, envoyé seulement à Roth (roth-touchlinesl.com,
+   en https).
+3. Ouvrez l'onglet **Découverte** et ajoutez les zones voulues.
 
-## Scènes
+Le bouton **Tester la connexion** lit Roth une fois et affiche son état.
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+## Commandes (désactivées par défaut)
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+Par défaut, Gladys ne fait que lire. Deux options séparées :
 
-## Tableau de bord
+- **Autoriser les commandes de consigne** : le tableau de bord, les scènes
+  et les assistants vocaux peuvent changer la consigne d'une zone. La zone
+  passe alors en température constante (elle quitte son programme, comme
+  dans l'application Roth).
+- **Autoriser les commandes de programme** : la liste « Programme » peut
+  mettre une zone sur l'un des programmes du régulateur, ou en température
+  constante (avec la consigne qu'elle a).
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+Bornes de sécurité :
 
-## Dépannage
+- une consigne va de 5 °C au **plafond des consignes**, **24 °C par
+  défaut**, réglable de 16 à 30 °C, jamais plus de 30 °C ;
+- un programme n'est choisi que si **toutes** ses températures restent dans
+  ces bornes (sinon la commande est refusée) ;
+- une zone en rafraîchissement, éteinte ou inconnue n'est jamais commandée ;
+- aucune commande ne passe par un interrupteur : un « éteins tout » d'un
+  assistant vocal ne touche jamais le chauffage. L'API de Roth n'a pas de
+  commande d'arrêt du chauffage.
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+Chaque commande relit la zone juste avant d'agir et décide sur cette
+lecture ; elle part dans les 3,5 s ou est refusée sans rien envoyer. Si
+Roth ne répond pas à temps après l'envoi, Gladys affiche « envoyée, sans
+confirmation » et relit la zone 5 s et 20 s plus tard. Une commande à la
+fois. Pour choisir un programme, Roth demande de renvoyer le programme
+entier : l'intégration le renvoie tel qu'elle vient de le lire, sans rien
+y changer.
+
+## Limites et sécurité
+
+- Lecture toutes les 60 s (de 30 s à 10 min).
+- Identifiants refusés : arrêt gardé dans `/data`, nouvel essai après
+  15 min, 1 h, 6 h puis toutes les 24 h, jamais en boucle ; enregistrer
+  d'autres identifiants ou presser « Tester la connexion » réessaie.
+- Jeton de Roth refusé : une seule nouvelle connexion, jamais deux
+  connexions en moins d'une minute (même après un redémarrage) ; un jeton
+  refusé juste après une connexion, ou trois renouvellements sans aucune
+  lecture réussie, donnent l'arrêt ci-dessus.
+- Roth occupé (HTTP 429) ou en panne (5xx) : pause de 1 min à 6 h, gardée
+  dans `/data`, pour les lectures comme pour les commandes.
+- `/data` ne contient jamais l'adresse e-mail, le mot de passe ni le jeton.
+- Une commande ne se connecte jamais à Roth elle-même : si le jeton vient
+  d'être refusé, elle répond « réessayez dans une minute ».
+
+## Crédits
+
+L'API de Roth et la forme de ses réponses viennent de
+[pytouchlinesl](https://github.com/jnsgruk/pytouchlinesl) (jnsgruk,
+Apache-2.0), la bibliothèque de l'intégration Home Assistant. Voir
+`THIRD_PARTY_NOTICES.md`.
