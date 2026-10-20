@@ -265,14 +265,56 @@ test('a restart within a minute of a sign-in waits for the minute', async (t) =>
     lastLoginAt: NOW - 20 * SECOND,
   });
   const roth = fakeRoth();
-  const { gladys, advance } = await setup(t, { roth, store, create: false });
+  const { gladys, advance } = await setup(t, {
+    roth,
+    store,
+    create: false,
+    config: { ...CONFIG, poll_interval: 600 },
+  });
   assert.equal(logins(roth), 0);
   assert.match(message(gladys).fr, /une connexion par minute/);
   await advance(30 * SECOND, 1000);
-  assert.equal(logins(roth), 0, 'not before the interval');
-  await advance(35 * SECOND, 1000);
-  assert.equal(logins(roth), 1);
+  assert.equal(logins(roth), 0, 'not within the minute');
+  await advance(15 * SECOND, 1000);
+  assert.equal(logins(roth), 1, 'as soon as the minute is over, not after the interval');
   assert.equal(gladys.fake.connectionStatus.connected, true);
+});
+
+test('saving only the interval keeps the token and the reads go on', async (t) => {
+  const roth = fakeRoth();
+  const { gladys, advance } = await setup(t, { roth });
+  gladys.fake.configUpdated({ ...CONFIG, poll_interval: 120 });
+  await advance(SECOND, 100);
+  assert.equal(gladys.fake.connectionStatus.connected, true);
+  const reads = () =>
+    roth.requests.filter((r) => r.path === `/users/${USER}/modules/${MODULE}`).length;
+  const before = reads();
+  await advance(100 * SECOND, 1000);
+  assert.equal(reads(), before, 'the new interval holds');
+  await advance(25 * SECOND, 1000);
+  assert.equal(reads(), before + 1);
+  assert.equal(logins(roth), 1, 'no new sign-in');
+});
+
+test('a restart without the programs read never shrinks the program list', async (t) => {
+  const roth = fakeRoth();
+  const { gladys, app, advance } = await setup(t, { roth });
+  const options = () =>
+    gladys.fake.discoveredDevices
+      .find((d) => d.external_id === device(KITCHEN))
+      .features.find((f) => f.external_id === feature(KITCHEN, 'program')).supported_options.length;
+  assert.equal(options(), 4);
+  // A restart within the minute of the sign-in: nothing read for a while.
+  const restarting = app.start(CONFIG);
+  await advance(SECOND, 100);
+  await restarting;
+  assert.equal(options(), 4);
+  // The module missing once (404).
+  await advance(MINUTE, 1000);
+  roth.failNext((r) => r.path === `/users/${USER}/modules/${MODULE}`, { status: 404 });
+  await advance(MINUTE, 1000);
+  await app.scan();
+  assert.equal(options(), 4);
 });
 
 test('HTTP 429 pauses every path, persisted, and a reconnection keeps the pause', async (t) => {
@@ -441,6 +483,38 @@ test('programs: off by default, bounded by the ceiling, the whole program sent b
   ack = await command(KITCHEN, 'program', 'constant');
   assert.equal(ack.success, true, ack.error);
   assert.equal(roth.writes()[1].body.mode.setTemperature, 200);
+});
+
+test('a ceiling lowered while a program or "constant" connects: nothing sent', async (t) => {
+  for (const [zoneId, value] of [
+    [BEDROOM, 'schedule-0'],
+    [KITCHEN, 'constant'],
+  ]) {
+    const roth = fakeRoth();
+    const { gladys, advance } = await setup(t, { roth, config: PROGRAMS });
+    roth.failNext((r) => r.method === 'POST', { connectDelay: 500 });
+    const d = gladys.fake.devices.find((x) => x.external_id === device(zoneId));
+    const f = d.features.find((x) => x.external_id === feature(zoneId, 'program'));
+    let ack;
+    gladys.fake.setValue(d, f, value).then((a) => (ack = a));
+    await advance(300, 50);
+    // Saved while the write waits for its connection: 16 °C, under 18 and 20 °C.
+    gladys.fake.configUpdated({ ...PROGRAMS, max_setpoint: 16 });
+    await advance(4 * SECOND, 50);
+    assert.equal(ack.success, false, value);
+    assert.match(ack.error, /hors de 5–16 °C/, value);
+    assert.equal(roth.writes().length, 0, value);
+    t.mock.timers.reset();
+  }
+});
+
+test('a zone on its own program or a temporary setpoint can be put on a program', async (t) => {
+  const roth = fakeRoth();
+  roth.zone(KITCHEN).mode.mode = 'localSchedule';
+  const { command } = await setup(t, { roth, config: PROGRAMS });
+  const ack = await command(KITCHEN, 'program', 'schedule-0');
+  assert.equal(ack.success, true, ack.error);
+  assert.equal(roth.writes().length, 1);
 });
 
 test('a cooling or switched-off zone is never commanded', async (t) => {

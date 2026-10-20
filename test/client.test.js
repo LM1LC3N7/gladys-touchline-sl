@@ -201,3 +201,21 @@ test('the transport speaks https only', async () => {
   assert.equal(err.code, CODES.UNREACHABLE);
   assert.equal(err.sent, false);
 });
+
+test('the time of a sign-in is saved before the sign-in leaves', async () => {
+  const transport = stub([signIn(), { status: 200, body: [] }]);
+  let release;
+  const saved = new Promise((resolve) => (release = resolve));
+  const c = new RothClient({
+    email: 'a@b',
+    password: 'p',
+    request: transport.request,
+    onLogin: () => saved,
+  });
+  const reading = c.modules();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(transport.requests.length, 0, 'waits for the save');
+  release();
+  await reading;
+  assert.equal(transport.requests.length, 2);
+});

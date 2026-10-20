@@ -188,7 +188,8 @@ export class RothClient {
     if (!this.mayLogin()) {
       throw new RothError(CODES.NO_SESSION);
     }
-    this.onLogin();
+    // The time of this sign-in is saved before it leaves (the minute between two holds across a crash).
+    await this.onLogin();
     let data;
     try {
       data = await this.exchange(

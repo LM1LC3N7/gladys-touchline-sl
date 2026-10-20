@@ -71,7 +71,9 @@ function comparable(role, zone) {
       ? undefined
       : `${zone.mode.name}:${zone.targetTenths}`;
   }
-  return programOf(zone);
+  // A zone on its own program or on a temporary setpoint compares as its
+  // mode: any choice of the list then differs and is sent.
+  return programOf(zone) ?? (zone.mode.name === undefined ? undefined : `mode:${zone.mode.name}`);
 }
 
 const zoneKeyOf = (moduleId, zoneId) => `${moduleId}:${zoneId}`;
@@ -168,9 +170,10 @@ export class TouchlineApp {
     return this.now() - this.memory.lastLoginAt >= TIMINGS.loginFloor;
   }
 
+  /** A sign-in is about to leave: its time is on disk first (a crash right after counts). */
   loggedIn() {
     this.memory.lastLoginAt = this.now();
-    void this.saveMemory();
+    return this.saveMemory();
   }
 
   async start(raw = {}) {
@@ -180,6 +183,9 @@ export class TouchlineApp {
     await this.loadMemory();
     this.config = normalizeConfig(raw);
     this.account = this.config.problem ? undefined : this.freshAccount(this.config);
+    // The roles are those this account reports from now on (the created
+    // features are kept anyway by keepCreatedFeatures).
+    this.seen.clear();
     this.published = undefined;
     this.badge = undefined;
     this.lastStatus = undefined;
@@ -254,12 +260,13 @@ export class TouchlineApp {
       await this.start(raw);
       return;
     }
-    if (next.pollInterval !== this.config.pollInterval) {
-      await this.start(raw);
-      return;
-    }
     const previous = this.config;
     this.config = next;
+    if (next.pollInterval !== previous.pollInterval && this.account && !this.account.running) {
+      // Only the interval: the account, its client and its token stay; the
+      // next read follows the new interval (a backoff or a pause still holds).
+      this.schedule();
+    }
     if (
       next.allowSetpoints !== previous.allowSetpoints ||
       next.allowPrograms !== previous.allowPrograms
@@ -472,12 +479,10 @@ export class TouchlineApp {
       return;
     }
     if (err.code === CODES.NO_SESSION) {
-      // A sign-in left less than a minute ago: the next one when the minute is over.
+      // A sign-in left less than a minute ago: the next one as soon as the
+      // minute is over (nothing was read: no read is repeated sooner).
       account.error = 'signIn';
-      account.wait = Math.max(
-        this.interval,
-        this.memory.lastLoginAt + TIMINGS.loginFloor - this.now(),
-      );
+      account.wait = Math.max(SECOND, this.memory.lastLoginAt + TIMINGS.loginFloor - this.now());
       return;
     }
     const reason = reasonOf(err);
@@ -836,7 +841,7 @@ export class TouchlineApp {
   }
 
   /** The checks before sending, on the latest configuration and state. */
-  checkBeforeSend(generation, account, { role }, wanted) {
+  checkBeforeSend(generation, account, { role }, temps) {
     if (!this.allowed(role)) {
       throw this.refusal(role === F.TARGET ? ERRORS.setpointsDisabled : ERRORS.programsDisabled);
     }
@@ -849,9 +854,16 @@ export class TouchlineApp {
     if (!account.client.hasSession) {
       throw this.refusal(ERRORS.noSession);
     }
-    // The ceiling may have been lowered since the command arrived.
-    if (wanted.tenths !== undefined) {
-      this.checkBounds(wanted.tenths);
+    // The ceiling may have been lowered since the command arrived: every
+    // temperature the command would set (a setpoint, the setpoint kept by
+    // "constant", all those of a program) is checked again.
+    const { low, high } = this.bounds();
+    if (temps.some((t) => t < low || t > high)) {
+      throw this.refusal(
+        role === F.TARGET
+          ? ERRORS.outOfRange(low / 10, high / 10)
+          : ERRORS.programOutOfRange(low / 10, high / 10),
+      );
     }
   }
 
@@ -859,7 +871,12 @@ export class TouchlineApp {
     const generation = this.generation;
     const account = this.account;
     const sendBy = received + TIMINGS.commandSendBy;
-    this.checkBeforeSend(generation, account, target, wanted);
+    this.checkBeforeSend(
+      generation,
+      account,
+      target,
+      wanted.tenths === undefined ? [] : [wanted.tenths],
+    );
     const { moduleId, zoneId, role } = target;
     if (!account.data.get(moduleId)?.zones.has(zoneId)) {
       throw this.refusal(ERRORS.unknownDevice);
@@ -917,7 +934,7 @@ export class TouchlineApp {
       return;
     }
     // The options may have been turned off during the read: checked again.
-    this.checkBeforeSend(generation, account, target, wanted);
+    this.checkBeforeSend(generation, account, target, plan.temps);
     if (this.now() > sendBy) {
       throw this.refusal(ERRORS.tooSlow);
     }
@@ -926,7 +943,7 @@ export class TouchlineApp {
       startBy: sendBy,
       answerBy: received + TIMINGS.commandAnswerBy,
       // The very last check, right before the request leaves.
-      beforeSend: () => this.checkBeforeSend(generation, account, target, wanted),
+      beforeSend: () => this.checkBeforeSend(generation, account, target, plan.temps),
     };
     try {
       await plan.send(account.client, options);
@@ -964,6 +981,7 @@ export class TouchlineApp {
     const modeId = zone.mode.id;
     const constant = (tenths) => ({
       expected: role === F.TARGET ? `constantTemp:${tenths}` : CONSTANT,
+      temps: [tenths],
       log: `${tenths / 10} °C`,
       send: (client, options) =>
         client.setZoneTemperature({ moduleId, modeId, zoneId: zone.id, tenths }, options),
@@ -1007,6 +1025,7 @@ export class TouchlineApp {
     };
     return {
       expected: scheduleOption(schedule.index),
+      temps: schedule.temps,
       log: `program ${schedule.index}`,
       send: (client, options) =>
         client.setZoneSchedule({ moduleId, zoneId: zone.id, payload }, options),

@@ -56,7 +56,14 @@ Bornes de sécurité :
   défaut**, réglable de 16 à 30 °C, jamais plus de 30 °C ;
 - un programme n'est choisi que si **toutes** ses températures restent dans
   ces bornes (sinon la commande est refusée) ;
+- le plafond est revérifié juste avant l'envoi : s'il a été baissé
+  pendant la commande, rien ne part ;
+- un programme mal lu (intervalle à moitié vide, zone au mode illisible)
+  n'est jamais renvoyé ;
 - une zone en rafraîchissement, éteinte ou inconnue n'est jamais commandée ;
+- une zone sur son propre programme ou en consigne temporaire peut être
+  mise sur un programme depuis la liste (la liste affiche alors le dernier
+  programme lu, le mode lu dit la vérité) ;
 - aucune commande ne passe par un interrupteur : un « éteins tout » d'un
   assistant vocal ne touche jamais le chauffage. L'API de Roth n'a pas de
   commande d'arrêt du chauffage.

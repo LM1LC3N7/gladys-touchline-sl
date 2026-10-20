@@ -54,7 +54,14 @@ Safety bounds:
   default**, adjustable from 16 to 30 °C, never more than 30 °C;
 - a program is chosen only when **all** its temperatures stay within these
   bounds (else the command is refused);
+- the ceiling is checked again right before sending: when it was lowered
+  during the command, nothing leaves;
+- a program not read well (a half-empty interval, a zone whose mode cannot
+  be read) is never sent back;
 - a zone that cools, is switched off or is unknown is never commanded;
+- a zone on its own program or a temporary setpoint can be put on a program
+  from the list (the list then shows the last program read, the mode read
+  tells the truth);
 - no command goes through a switch: a "turn everything off" of a voice
   assistant never reaches the heating. The Roth API has no command to turn
   the heating off.

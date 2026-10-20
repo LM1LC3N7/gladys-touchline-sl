@@ -104,8 +104,8 @@ export const T = {
         'Roth a refusé l’adresse e-mail ou le mot de passe.',
       ),
       both(
-        `Next try in ${wait.en}; save them again or press "Test the connection" to try now.`,
-        `Nouvel essai dans ${wait.fr} ; enregistrez-les à nouveau ou pressez « Tester la connexion » pour essayer maintenant.`,
+        `Next try in ${wait.en}; save other credentials or press "Test the connection" to try now.`,
+        `Nouvel essai dans ${wait.fr} ; enregistrez d’autres identifiants ou pressez « Tester la connexion » pour essayer maintenant.`,
       ),
     ),
   busy: (wait) =>

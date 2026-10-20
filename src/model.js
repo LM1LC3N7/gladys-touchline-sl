@@ -22,7 +22,9 @@ export function nameOf(value) {
   // Control characters out; one pass.
   // eslint-disable-next-line no-control-regex
   const text = value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
-  return text === '' ? undefined : text.slice(0, LIMITS.nameLength);
+  // Trimmed again after the cut: the core refuses an option label ending in a space.
+  const cut = text.slice(0, LIMITS.nameLength).trim();
+  return cut === '' ? undefined : cut;
 }
 
 const MODULE_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -128,8 +130,13 @@ function intervalsOf(value) {
     if (start === undefined || stop === undefined || temp === undefined) {
       return undefined;
     }
-    if (start === EMPTY_INTERVAL || stop === EMPTY_INTERVAL) {
+    if (start === EMPTY_INTERVAL && stop === EMPTY_INTERVAL) {
+      // Empty: left out, as pytouchlinesl does.
       continue;
+    }
+    if (start === EMPTY_INTERVAL || stop === EMPTY_INTERVAL) {
+      // Half empty: not understood, so the program is not sent back.
+      return undefined;
     }
     if (start > MINUTES_IN_DAY || stop > MINUTES_IN_DAY) {
       return undefined;
@@ -211,7 +218,15 @@ export function moduleOf(data) {
   }
   // Complete only when every zone element was read: assigning a program sends
   // back the list of its zones, and a zone left out would leave the program.
-  return { zones: list, schedules, complete: list.length === elements.length };
+  // A zone whose mode cannot be read could be on the program without us
+  // knowing it: the module is then incomplete too.
+  const modesRead = list.every(
+    (z) =>
+      z.mode.id !== undefined &&
+      z.mode.name !== undefined &&
+      (z.mode.name !== 'globalSchedule' || z.mode.scheduleIndex !== undefined),
+  );
+  return { zones: list, schedules, complete: list.length === elements.length && modesRead };
 }
 
 /** A zone shown in Gladys: switched on and registered (pytouchlinesl `enabled`, HA). */

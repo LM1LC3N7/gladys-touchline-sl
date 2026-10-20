@@ -64,15 +64,29 @@ container (no Docker on the development PC).
 - **No energy index**: the API gives none.
 - **A read begun before a write** is dropped (the follow-up reads 5 s and
   20 s later show the result), so a stale value never lifts a guard.
+- **Review 1 fixes**: the ceiling is checked again in `beforeSend` against
+  every temperature a command would set (the setpoint, the one kept by
+  "constant", all those of a program); the program list is published only
+  when the programs of the module were read (else the created feature is
+  kept as it is), and the roles seen are reset at each start; saving only
+  the interval keeps the client and its token; after a sign-in blocked by
+  the minute, the next try comes when the minute is over (not after the
+  interval); a half-empty interval (only start or stop at 6100) or a zone
+  whose mode cannot be read refuses a program command; names are trimmed
+  after the cut; the time of a sign-in is saved before it leaves.
+- **Program options**: the core synchronises `supported_options` at each
+  publication of the device; the values (`constant`, `schedule-<index>`)
+  stay the same when a program is renamed, only the labels change.
+- **Zones on their own program or a temporary setpoint** (`localSchedule`,
+  `timeLimit`) can be put on a program or on "constant" from the list.
 - **Polling 60 s by default** (Home Assistant: 30 s), 30 s minimum.
 
 ## Next
 
 - Test with a real account (lifetime of the token, the error of a wrong
   password, the answer of the writes, the 0.5 °C step of the Roth app).
-- The program options are frozen at the creation of the device: a program
-  renamed or added later changes the `supported_options` of the feature;
-  check how the core takes it.
-- Local schedules (`localSchedule`) and temporary setpoints (`timeLimit`):
-  shown, not commanded.
+- Local schedules (`localSchedule`) and temporary setpoints (`timeLimit`)
+  have no option of their own in the program list: the list keeps showing
+  the last program or "constant" read, the mode text says the truth. Any
+  choice from the list is sent (it differs from such a mode).
 - Cooling zones: commands with their own bounds.

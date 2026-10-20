@@ -227,14 +227,17 @@ export function buildDevice(
     external_id: ids.device,
     model: module?.type ? `Roth Touchline SL (${module.type})` : 'Roth Touchline SL',
     should_poll: false,
-    features: ROLES.filter((role) => roles.has(role)).map((role) => ({
-      name: word(FEATURE_NAMES[role], language),
-      external_id: ids.feature(role),
-      ...definitionOf(role),
-      ...(role === F.PROGRAM
-        ? { supported_options: programOptions(schedules ?? [], language) }
-        : {}),
-    })),
+    // The program list only when the programs of the module were read: never
+    // a list shrunk to "constant" (the core would drop the stored options);
+    // the feature already created is kept as it is meanwhile.
+    features: ROLES.filter((role) => roles.has(role) && (role !== F.PROGRAM || schedules)).map(
+      (role) => ({
+        name: word(FEATURE_NAMES[role], language),
+        external_id: ids.feature(role),
+        ...definitionOf(role),
+        ...(role === F.PROGRAM ? { supported_options: programOptions(schedules, language) } : {}),
+      }),
+    ),
     params,
   };
   return keepCreatedFeatures(built, created);

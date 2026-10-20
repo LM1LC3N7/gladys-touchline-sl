@@ -28,4 +28,20 @@ the notes of the version's GitHub Release.
   secret in `/data`).
 - "Test the connection" button, guides in English and French, cover image.
 
+### Fixed
+
+- A ceiling lowered while a program or "constant temperature" command was
+  connecting is checked again right before it leaves: nothing is sent.
+- The program list of a created zone never shrinks to "constant" when the
+  programs could not be read (restart, controller missing once).
+- Saving only the refresh interval keeps the connection; after a sign-in
+  blocked by the minute between two, the next try comes when the minute is
+  over.
+- A program with a half-empty interval, or a module with a zone whose mode
+  cannot be read, is never sent back.
+- A zone on its own program or a temporary setpoint can be put on a program
+  from the list.
+- Program and zone names cut at 60 characters no longer end with a space.
+- The status after refused credentials asks to save other credentials.
+
 [Unreleased]: https://github.com/LM1LC3N7/gladys-touchline-sl/commits/main

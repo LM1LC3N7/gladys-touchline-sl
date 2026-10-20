@@ -153,3 +153,41 @@ test('/data: bounded, known keys only, never a secret', () => {
     lastLoginAt: 0,
   });
 });
+
+test('a half-empty interval makes the program incomplete; only empty ones are dropped', () => {
+  for (const half of [
+    { start: 6100, stop: 600, temp: 200 },
+    { start: 300, stop: 6100, temp: 200 },
+  ]) {
+    const s = schedule(1, 0, 'Half');
+    s.p0Intervals = [{ start: 300, stop: 540, temp: 200 }, half];
+    const [parsed] = moduleOf({
+      zones: { elements: [], globalSchedules: { elements: [s] } },
+    }).schedules;
+    assert.equal(parsed.complete, false, JSON.stringify(half));
+  }
+});
+
+test('a zone whose mode cannot be read makes the module incomplete', () => {
+  const variants = [
+    (e) => (e.mode.mode = 'other'),
+    (e) => delete e.mode.id,
+    (e) => (e.mode.scheduleIndex = 'x'),
+  ];
+  for (const change of variants) {
+    const data = moduleData();
+    // The kitchen follows a global schedule.
+    change(data.zones.elements[0]);
+    assert.equal(moduleOf(data).complete, false, String(change));
+  }
+  assert.equal(moduleOf(moduleData()).complete, true);
+});
+
+test('a name cut at its maximum never ends with a space', () => {
+  const s = schedule(1, 0, `${'a'.repeat(59)} tail`);
+  const [parsed] = moduleOf({
+    zones: { elements: [], globalSchedules: { elements: [s] } },
+  }).schedules;
+  assert.equal(parsed.name, 'a'.repeat(59));
+  assert.equal(parsed.sendName, `${'a'.repeat(59)} tail`, 'sent back unchanged');
+});
