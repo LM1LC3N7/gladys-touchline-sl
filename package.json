@@ -1,6 +1,6 @@
 {
   "name": "gladys-touchline-sl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Gladys Assistant external integration for the Roth Touchline SL underfloor heating, through the public Roth Touchline SL API: zones, temperatures, humidity, setpoints and programs, optional bounded commands. Unofficial, not affiliated with Roth.",
   "type": "module",
