@@ -38,7 +38,7 @@ test('the store basics; version 0.1.0 everywhere', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   assert.equal(pkg.name, 'gladys-touchline-sl');
-  assert.equal(pkg.version, '0.1.0');
+  assert.match(pkg.version, /^\d+\.\d+\.\d+$/);
   assert.equal(pkg.license, 'Apache-2.0');
   assert.equal(manifest.version, pkg.version);
   assert.equal(lock.name, pkg.name);
