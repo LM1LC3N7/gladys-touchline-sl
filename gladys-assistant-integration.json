@@ -6,8 +6,8 @@
     "en": "Roth Touchline SL underfloor heating: rooms, temperatures, optional setpoints and programs.",
     "fr": "Plancher chauffant Roth Touchline SL : pièces, températures, consignes et programmes en option."
   },
-  "version": "0.1.1",
-  "docker_image": "ghcr.io/lm1lc3n7/gladys-touchline-sl:0.1.1",
+  "version": "0.1.2",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-touchline-sl:0.1.2",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-touchline-sl/main/cover.png",
   "categories": ["climate"],
